@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🕺 Squat Rep Counter - PoseNet</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Orbitron', monospace;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            overflow-x: hidden;
+            animation: gradientShift 8s ease infinite;
+        }
+
+        @keyframes gradientShift {
+            0%, 100% { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+            50% { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 0 0 20px rgba(255,255,255,0.8);
+        }
+
+        h1 {
+            font-size: clamp(2rem, 5vw, 4rem);
+            font-weight: 900;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: textGlow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes textGlow {
+            from { filter: drop-shadow(0 0 5px #fff); }
+            to { filter: drop-shadow(0 0 20px #ff6b6b); }
+        }
+
+        #container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 30px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.2);
+            max-width: 90vw;
+            max-height: 90vh;
+        }
+
+        #videoContainer {
+            position: relative;
+            width: clamp(320px, 70vw, 800px);
+            height: clamp(240px, 52.5vw, 600px);
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            margin-bottom: 25px;
+        }
+
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 20px;
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 20px;
+            pointer-events: none;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 15px 30px;
+            font-size: clamp(14px, 2vw, 18px);
+            font-family: 'Orbitron', monospace;
+            font-weight: 700;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            color: white;
+            box-shadow: 0 10px 30px rgba(255,107,107,0.4);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            box-shadow: 0 10px 30px rgba(102,126,234,0.4);
+        }
+
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        #status {
+            font-size: clamp(16px, 3vw, 24px);
+            font-weight: 700;
+            margin-bottom: 20px;
+            min-height: 30px;
+            text-shadow: 0 0 10px currentColor;
+        }
+
+        .stats {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .stat {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            padding: 10px 20px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .confidence-bar {
+            width: 100px;
+            height: 8px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff4757, #ffa502, #2ed573);
+            transition: width 0.3s ease;
+            border-radius: 4px;
+        }
+
+        .angle-bar {
+            width: 100px;
+            height: 8px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+
+        .angle-fill {
+            height: 100%;
+            transition: width 0.3s ease;
+            border-radius: 4px;
+        }
+
+        #info {
+            text-align: center;
+            max-width: 640px;
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.1);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        @media (max-width: 768px) {
+            .controls { flex-direction: column; align-items: center; }
+            button { width: 200px; }
+            .stats { flex-direction: column; align-items: center; }
+        }
+
+        .fps-counter {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: lime;
+            padding: 5px 10px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-family: monospace;
+        }
+
+        .squat-highlight {
+            box-shadow: 0 0 30px #ffaa00;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🕺 Squat Rep Counter</h1>
+        <p>Count squats using AI pose detection & knee angles</p>
+    </div>
+
+    <div id="container">
+        <div id="videoContainer">
+            <video id="video" autoplay playsinline muted></video>
+            <canvas id="canvas"></canvas>
+            <div class="fps-counter" id="fps">0 FPS</div>
+        </div>
+
+        <div class="controls">
+            <button id="startBtn" class="btn-primary">🎥 Start Squats</button>
+            <button id="stopBtn" class="btn-secondary" disabled>⏹️ Stop</button>
+            <button id="resetBtn" class="btn-secondary" disabled>🔄 Reset Reps</button>
+        </div>
+
+        <div id="status">🚀 Ready to count squats!</div>
+
+        <div class="stats" id="stats" style="display: none;">
+            <div class="stat">
+                Pose Confidence
+                <div class="confidence-bar">
+                    <div class="confidence-fill" id="confidenceFill" style="width: 0%"></div>
+                </div>
+                <span id="confidenceText">0%</span>
+            </div>
+            <div class="stat">
+                Keypoints<br>
+                <span id="keypointCount">0</span>/17
+            </div>
+            <div class="stat">
+                Knee Angle
+                <div class="angle-bar">
+                    <div class="angle-fill" id="angleFill" style="width: 0%; background: linear-gradient(90deg, #ff6b6b, #feca57);"></div>
+                </div>
+                <span id="kneeAngle">0°</span>
+            </div>
+            <div class="stat">
+                Squat Reps<br>
+                <span id="repCount">0</span>
+            </div>
+        </div>
+
+        <div id="info">
+            <strong>💪 How to use:</strong> Face camera straight → Start → Do squats (knees ~90° down, stand fully up).<br>
+            Deep squat = <80° angle → Stand = >120°. Reps auto-counted. Good form = yellow highlight!
+        </div>
+    </div>
+
+    <!-- TensorFlow.js core -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.1/dist/tf.min.js"></script>
+    <!-- PoseNet -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet@2.2.2/dist/posenet.min.js"></script>
+
+    <script>
+        class SquatCounter {
+            constructor() {
+                this.video = document.getElementById('video');
+                this.canvas = document.getElementById('canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.net = null;
+                this.isDetecting = false;
+                this.animationId = null;
+                this.stream = null;
+                this.lastTimestamp = 0;
+                this.fps = 0;
+                
+                // Squat counter state
+                this.angleHistory = [];
+                this.reps = 0;
+                this.state = 'unknown'; // 'stand', 'squat', 'unknown'
+                this.standCount = 0;
+                this.squatCount = 0;
+                this.squatThreshold = 80;
+                this.standThreshold = 120;
+                this.minConsecutive = 3; // frames
+                
+                this.init();
+            }
+
+            // Vector utilities
+            subtractVectors(v1, v2) {
+                return { x: v1.x - v2.x, y: v1.y - v2.y };
+            }
+
+            dotProduct(v1, v2) {
+                return v1.x * v2.x + v1.y * v2.y;
+            }
+
+            magnitude(v) {
+                return Math.sqrt(v.x * v.x + v.y * v.y);
+            }
+
+            angleBetweenVectors(v1, v2) {
+                const dot = this.dotProduct(v1, v2);
+                const mag1 = this.magnitude(v1);
+                const mag2 = this.magnitude(v2);
+                const cosTheta = dot / (mag1 * mag2);
+                return Math.acos(Math.max(-1, Math.min(1, cosTheta))) * 180 / Math.PI;
+            }
+
+            calculateKneeAngle(keypoints) {
+                const leftHip = keypoints[11], leftKnee = keypoints[13], leftAnkle = keypoints[15];
+                const rightHip = keypoints[12], rightKnee = keypoints[14], rightAnkle = keypoints[16];
+                
+                let angles = [];
+                
+                // Left leg
+                if (leftHip.score > 0.4 && leftKnee.score > 0.4 && leftAnkle.score > 0.4) {
+                    const hipKnee = this.subtractVectors(leftKnee.position, leftHip.position);
+                    const kneeAnkle = this.subtractVectors(leftAnkle.position, leftKnee.position);
+                    angles.push(this.angleBetweenVectors(hipKnee, kneeAnkle));
+                }
+                
+                // Right leg
+                if (rightHip.score > 0.4 && rightKnee.score > 0.4 && rightAnkle.score > 0.4) {
+                    const hipKnee = this.subtractVectors(rightKnee.position, rightHip.position);
+                    const kneeAnkle = this.subtractVectors(rightAnkle.position, rightKnee.position);
+                    angles.push(this.angleBetweenVectors(hipKnee, kneeAnkle));
+                }
+                
+                return angles.length > 0 ? angles.reduce((a, b) => a + b, 0) / angles.length : 180;
+            }
+
+            async init() {
+                const resizeObserver = new ResizeObserver(entries => {
+                    for (let entry of entries) {
+                        const { width, height } = entry.contentRect;
+                        this.canvas.width = width;
+                        this.canvas.height = height;
+                    }
+                });
+                resizeObserver.observe(document.getElementById('videoContainer'));
+
+                try {
+                    document.getElementById('status').textContent = '🧠 Loading PoseNet...';
+                    this.net = await posenet.load({
+                        architecture: 'MobileNetV1',
+                        outputStride: 16,
+                        inputResolution: { width: 513, height: 513 },
+                        multiplier: 0.75,
+                        quantBytes: 2
+                    });
+                    document.getElementById('status').textContent = '✅ Ready! Do squats facing camera.';
+                } catch (error) {
+                    console.error('Model load error:', error);
+                    document.getElementById('status').textContent = '❌ Model failed to load';
+                }
+
+                document.getElementById('startBtn').onclick = () => this.start();
+                document.getElementById('stopBtn').onclick = () => this.stop();
+                document.getElementById('resetBtn').onclick = () => this.resetReps();
+
+                setInterval(() => {
+                    document.getElementById('fps').textContent = `${Math.round(this.fps)} FPS`;
+                }, 1000);
+            }
+
+            async start() {
+                try {
+                    document.getElementById('status').textContent = '📹 Starting camera...';
+                    
+                    this.stream = await navigator.mediaDevices.getUserMedia({
+                        video: { 
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 },
+                            facingMode: 'user'
+                        }
+                    });
+                    
+                    this.video.srcObject = this.stream;
+                    await new Promise(resolve => this.video.onloadedmetadata = () => resolve());
+                    
+                    document.getElementById('startBtn').disabled = true;
+                    document.getElementById('stopBtn').disabled = false;
+                    document.getElementById('resetBtn').disabled = false;
+                    document.getElementById('stats').style.display = 'flex';
+                    
+                    this.isDetecting = true;
+                    this.detectLoop();
+                } catch (error) {
+                    document.getElementById('status').textContent = `❌ Camera error: ${error.message}`;
+                }
+            }
+
+            stop() {
+                this.isDetecting = false;
+                if (this.animationId) cancelAnimationFrame(this.animationId);
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                }
+                this.video.srcObject = null;
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('stopBtn').disabled = true;
+                document.getElementById('resetBtn').disabled = true;
+                document.getElementById('status').textContent = `⏹️ Stopped. Total reps: ${this.reps}`;
+            }
+
+            resetReps() {
+                this.reps = 0;
+                this.state = 'unknown';
+                this.standCount = 0;
+                this.squatCount = 0;
+                this.angleHistory = [];
+                document.getElementById('repCount').textContent = '0';
+                document.getElementById('status').textContent = '🔄 Reps reset!';
+            }
+
+            async detectLoop() {
+                if (!this.isDetecting || !this.net) return;
+
+                const timestamp = performance.now();
+                this.fps = 1000 / (timestamp - this.lastTimestamp);
+                this.lastTimestamp = timestamp;
+
+                try {
+                    const pose = await this.net.estimateSinglePose(this.video, {
+                        flipHorizontal: true
+                    });
+
+                    this.drawPose(pose);
+                    this.updateStats(pose);
+
+                } catch (error) {
+                    console.error('Detection error:', error);
+                }
+
+                this.animationId = requestAnimationFrame(() => this.detectLoop());
+            }
+
+            updateStats(pose) {
+                // Existing stats
+                const visibleKeypoints = pose.keypoints.filter(kp => kp.score > 0.5).length;
+                const confidence = Math.max(...pose.keypoints.map(kp => kp.score));
+                
+                document.getElementById('confidenceFill').style.width = `${confidence * 100}%`;
+                document.getElementById('confidenceText').textContent = `${Math.round(confidence * 100)}%`;
+                document.getElementById('keypointCount').textContent = visibleKeypoints;
+
+                // Squat angle calculation
+                const angle = this.calculateKneeAngle(pose.keypoints);
+                this.angleHistory.push(angle);
+                if (this.angleHistory.length > 10) this.angleHistory.shift();
+                
+                const avgAngle = this.angleHistory.reduce((a, b) => a + b, 0) / this.angleHistory.length;
+                
+                // Update UI
+                const anglePercent = Math.max(0, Math.min(100, (180 - avgAngle) / 1.8)); // 0-180 -> 100-0%
+                document.getElementById('angleFill').style.width = `${anglePercent}%`;
+                document.getElementById('kneeAngle').textContent = `${Math.round(avgAngle)}°`;
+                document.getElementById('repCount').textContent = this.reps;
+
+                // State machine for reps
+                if (avgAngle < this.squatThreshold) {
+                    this.squatCount++;
+                    this.standCount = 0;
+                    if (this.squatCount >= this.minConsecutive && this.state === 'stand') {
+                        // Possible rep start
+                        this.state = 'squat';
+                    }
+                } else if (avgAngle > this.standThreshold) {
+                    this.standCount++;
+                    this.squatCount = 0;
+                    if (this.standCount >= this.minConsecutive && this.state === 'squat') {
+                        // Rep complete!
+                        this.reps++;
+                        this.state = 'stand';
+                        document.getElementById('status').textContent = `🎉 Rep ${this.reps}! Keep going!`;
+                        // Audio feedback (optional)
+                        // new Audio('data:audio/wav;base64,...').play();
+                    }
+                } else {
+                    this.squatCount = 0;
+                    this.standCount = 0;
+                }
+            }
+
+            drawPose(pose) {
+                this.ctx.save();
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+                // Determine if in squat for highlighting
+                const kneeAngle = this.calculateKneeAngle(pose.keypoints);
+                const isSquat = kneeAngle < 90;
+
+                // Draw keypoints
+                pose.keypoints.forEach((keypoint, index) => {
+                    if (keypoint.score > 0.3) {
+                        const pos = this.scaleToCanvas(keypoint.position);
+                        
+                        let color = 'rgba(0,255,255,1)';
+                        let glowColor = '#00ffff';
+                        
+                        // Highlight squat keypoints
+                        if (isSquat && [11,12,13,14,15,16].includes(index)) {
+                            color = '#ffaa00';
+                            glowColor = '#ffaa00';
+                        }
+                        
+                        const gradient = this.ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, 15);
+                        gradient.addColorStop(0, `${color}${Math.floor(keypoint.score * 255).toString(16).padStart(2,'0')}`);
+                        gradient.addColorStop(0.6, `${color}${Math.floor(keypoint.score * 75).toString(16).padStart(2,'0')}`);
+                        gradient.addColorStop(1, 'transparent');
+                        
+                        this.ctx.fillStyle = gradient;
+                        this.ctx.beginPath();
+                        this.ctx.arc(pos.x, pos.y, 12, 0, Math.PI * 2);
+                        this.ctx.fill();
+                        
+                        this.ctx.fillStyle = color;
+                        this.ctx.beginPath();
+                        this.ctx.arc(pos.x, pos.y, 6, 0, Math.PI * 2);
+                        this.ctx.fill();
+                        
+                        this.ctx.fillStyle = 'rgba(255,255,255,0.9)';
+                        this.ctx.font = 'bold 12px Orbitron';
+                        this.ctx.textAlign = 'center';
+                        this.ctx.fillText(keypoint.part[0], pos.x, pos.y - 20);
+                    }
+                });
+
+                this.drawSkeleton(pose.keypoints, isSquat);
+                this.ctx.restore();
+            }
+
+            drawSkeleton(keypoints, highlightLegs = false) {
+                const adjacentKeyPoints = [
+                    [0, 1], [0, 2], [1, 3], [2, 4], [0, 5], [5, 6],
+                    [5, 11], [6, 12], [11, 12], [5, 7], [7, 9],
+                    [6, 8], [8, 10], [11, 13], [13, 15], [12, 14], [14, 16]
+                ];
+
+                keypoints.forEach((keypoint1, i) => {
+                    adjacentKeyPoints.forEach(([i1, i2]) => {
+                        if (i === i1 || i === i2) {
+                            const keypoint2 = keypoints[i2 === i ? i1 : i2];
+                            if (keypoint1.score > 0.3 && keypoint2.score > 0.3) {
+                                const p1 = this.scaleToCanvas(keypoint1.position);
+                                const p2 = this.scaleToCanvas(keypoint2.position);
+                                
+                                let lineColor = `rgba(255,255,255,${Math.min(keypoint1.score, keypoint2.score) * 0.6})`;
+                                if (highlightLegs && ((i1 === 11 && i2 === 13) || (i1 === 13 && i2 === 15) || 
+                                                    (i1 === 12 && i2 === 14) || (i1 === 14 && i2 === 16) ||
+                                                    (i1 === 11 && i2 === 12))) {
+                                    lineColor = `rgba(255,170,0,${Math.min(keypoint1.score, keypoint2.score) * 0.8})`;
+                                }
+                                
+                                this.ctx.lineWidth = 8;
+                                this.ctx.strokeStyle = lineColor;
+                                this.ctx.lineCap = 'round';
+                                this.ctx.shadowBlur = 20;
+                                this.ctx.shadowColor = lineColor === 'rgba(255,170,0,...)' ? '#ffaa00' : '#00ffff';
+                                this.ctx.beginPath();
+                                this.ctx.moveTo(p1.x, p1.y);
+                                this.ctx.lineTo(p2.x, p2.y);
+                                this.ctx.stroke();
+                                this.ctx.shadowBlur = 0;
+                            }
+                        }
+                    });
+                });
+            }
+
+            scaleToCanvas(point) {
+                const scaleX = this.canvas.width / 1;
+                const scaleY = this.canvas.height / 1;
+                return { 
+                    x: point.x * scaleX, 
+                    y: point.y * scaleY 
+                };
+            }
+        }
+
+        window.addEventListener('load', () => new SquatCounter());
+    </script>
+</body>
+</html>

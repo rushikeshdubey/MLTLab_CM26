@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<title>Custom Dataset Sentiment Trainer</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+
+body{
+font-family:Arial;
+background:#0f172a;
+color:white;
+text-align:center;
+padding:40px;
+}
+
+.card{
+background:#1e293b;
+padding:20px;
+border-radius:10px;
+margin:20px auto;
+width:500px;
+}
+
+button{
+padding:12px 25px;
+font-size:16px;
+border:none;
+border-radius:8px;
+background:#6366f1;
+color:white;
+cursor:pointer;
+}
+
+canvas{
+background:white;
+border-radius:10px;
+margin-top:20px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h1>Train Sentiment Model (Your Dataset)</h1>
+
+<div class="card">
+
+<input type="file" id="dataset">
+
+<br><br>
+
+<button onclick="train()">Train Model</button>
+
+<p id="status">Waiting for dataset</p>
+
+</div>
+
+<div class="card">
+
+<h3>Accuracy Graph</h3>
+<canvas id="accChart"></canvas>
+
+</div>
+
+<div class="card">
+
+<h3>Loss Graph</h3>
+<canvas id="lossChart"></canvas>
+
+</div>
+
+<script>
+
+const CONFIG={
+maxLength:30,
+vocabSize:5000,
+embeddingDim:16,
+epochs:10,
+batchSize:16
+}
+
+let vocab={}
+
+function tokenize(t){
+
+return t.toLowerCase()
+.replace(/[^\w\s]/g,"")
+.split(" ")
+
+}
+
+function buildVocab(texts){
+
+let counts={}
+
+texts.forEach(t=>{
+
+tokenize(t).forEach(w=>{
+
+counts[w]=(counts[w]||0)+1
+
+})
+
+})
+
+let map={"<PAD>":0,"<UNK>":1}
+
+Object.keys(counts).forEach((w,i)=>{
+
+map[w]=i+2
+
+})
+
+return map
+
+}
+
+function seq(text){
+
+let words=tokenize(text)
+
+let s=words.map(w=>vocab[w]||1)
+
+while(s.length<CONFIG.maxLength) s.push(0)
+
+return s.slice(0,CONFIG.maxLength)
+
+}
+
+function createDense(){
+
+let m=tf.sequential()
+
+m.add(tf.layers.embedding({
+
+inputDim:CONFIG.vocabSize,
+outputDim:CONFIG.embeddingDim,
+inputLength:CONFIG.maxLength
+
+}))
+
+m.add(tf.layers.globalAveragePooling1d())
+
+m.add(tf.layers.dense({units:32,activation:"relu"}))
+
+m.add(tf.layers.dense({units:1,activation:"sigmoid"}))
+
+m.compile({
+
+optimizer:"adam",
+loss:"binaryCrossentropy",
+metrics:["accuracy"]
+
+})
+
+return m
+
+}
+
+async function train(){
+
+let file=document.getElementById("dataset").files[0]
+
+if(!file){
+
+alert("Upload dataset CSV")
+
+return
+
+}
+
+let text=await file.text()
+
+let lines=text.trim().split("\n")
+
+let texts=[]
+let labels=[]
+
+for(let i=1;i<lines.length;i++){
+
+let parts=lines[i].split(",")
+
+texts.push(parts[0])
+labels.push([parseInt(parts[1])])
+
+}
+
+vocab=buildVocab(texts)
+
+let xs=texts.map(t=>seq(t))
+
+let xsTensor=tf.tensor2d(xs)
+let ysTensor=tf.tensor2d(labels)
+
+let model=createDense()
+
+let acc=[]
+let loss=[]
+
+document.getElementById("status").innerText="Training..."
+
+await model.fit(xsTensor,ysTensor,{
+
+epochs:CONFIG.epochs,
+batchSize:CONFIG.batchSize,
+
+callbacks:{
+
+onEpochEnd:(e,l)=>{
+
+acc.push(l.acc)
+loss.push(l.loss)
+
+document.getElementById("status").innerText=
+"Epoch "+(e+1)+" Loss "+l.loss.toFixed(3)
+
+updateCharts(acc,loss)
+
+}
+
+}
+
+})
+
+document.getElementById("status").innerText="Training Complete"
+
+}
+
+let accChart
+let lossChart
+
+function updateCharts(acc,loss){
+
+let labels=acc.map((_,i)=>i+1)
+
+if(!accChart){
+
+accChart=new Chart(
+
+document.getElementById("accChart"),
+
+{
+type:"line",
+data:{
+labels:labels,
+datasets:[{
+label:"Accuracy",
+data:acc
+}]
+}
+})
+
+}else{
+
+accChart.data.labels=labels
+accChart.data.datasets[0].data=acc
+accChart.update()
+
+}
+
+if(!lossChart){
+
+lossChart=new Chart(
+
+document.getElementById("lossChart"),
+
+{
+type:"line",
+data:{
+labels:labels,
+datasets:[{
+label:"Loss",
+data:loss
+}]
+}
+})
+
+}else{
+
+lossChart.data.labels=labels
+lossChart.data.datasets[0].data=loss
+lossChart.update()
+
+}
+
+}
+
+</script>
+
+</body>
+
+</html>

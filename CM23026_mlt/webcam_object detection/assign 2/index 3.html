@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Overlay Labels</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+</head>
+<body>
+  <h2>Overlay Classification on Video</h2>
+  
+  <div style="position: relative; width: 400px;">
+    <video id="webcam" autoplay playsinline width="400" height="300"></video>
+    <canvas id="overlay" width="400" height="300" 
+            style="position:absolute; top:0; left:0;"></canvas>
+  </div>
+
+  <script>
+    const video = document.getElementById("webcam");
+    const canvas = document.getElementById("overlay");
+    const ctx = canvas.getContext("2d");
+
+    async function setupCamera() {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = stream;
+      return new Promise(resolve => {
+        video.onloadedmetadata = () => resolve(video);
+      });
+    }
+
+    async function run() {
+      await setupCamera();
+      const model = await mobilenet.load();
+
+      async function detect() {
+        const predictions = await model.classify(video);
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "red";
+        ctx.font = "20px Arial";
+        ctx.fillText(
+          predictions[0].className + 
+          " (" + (predictions[0].probability * 100).toFixed(2) + "%)",
+          10, 30
+        );
+
+        requestAnimationFrame(detect);
+      }
+
+      detect();
+    }
+
+    run();
+  </script>
+</body>
+</html>

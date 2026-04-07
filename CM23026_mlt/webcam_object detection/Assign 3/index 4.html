@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>FPS Measurement</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+</head>
+<body>
+  <h2>FPS Performance Analysis</h2>
+
+  <video id="webcam" autoplay playsinline width="400" height="300"></video>
+  <p id="result"></p>
+  <p id="fps"></p>
+
+  <script>
+    const video = document.getElementById("webcam");
+    const result = document.getElementById("result");
+    const fpsText = document.getElementById("fps");
+
+    async function setupCamera() {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = stream;
+      return new Promise(resolve => {
+        video.onloadedmetadata = () => resolve(video);
+      });
+    }
+
+    async function run() {
+      await setupCamera();
+      const model = await mobilenet.load();
+
+      let lastTime = performance.now();
+      let frames = 0;
+
+      while (true) {
+        const predictions = await model.classify(video);
+
+        result.innerText = predictions[0].className;
+
+        frames++;
+        let now = performance.now();
+
+        if (now - lastTime >= 1000) {
+          fpsText.innerText = "FPS: " + frames;
+          frames = 0;
+          lastTime = now;
+        }
+
+        await tf.nextFrame();
+      }
+    }
+
+    run();
+  </script>
+</body>
+</html>

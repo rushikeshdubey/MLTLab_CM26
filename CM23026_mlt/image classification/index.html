@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Image Classification - MobileNet</title>
+
+    <!-- TensorFlow.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+
+    <!-- MobileNet model CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+
+    <style>
+        body {
+            font-family: Arial;
+            text-align: center;
+            padding: 20px;
+        }
+        img {
+            max-width: 300px;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Image Classification using MobileNet</h2>
+
+<input type="file" id="imageUpload" accept="image/*">
+<br>
+<img id="preview" />
+<h3 id="result">Model loading...</h3>
+
+<script>
+let model;
+
+// Load model
+async function loadModel() {
+    model = await mobilenet.load();
+    document.getElementById("result").innerText = "Model loaded. Upload an image.";
+}
+
+loadModel();
+
+// Handle image upload
+document.getElementById("imageUpload").addEventListener("change", async function (event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const img = document.getElementById("preview");
+    img.src = URL.createObjectURL(file);
+
+    img.onload = async () => {
+        document.getElementById("result").innerText = "Classifying...";
+        
+        const predictions = await model.classify(img);
+
+        document.getElementById("result").innerHTML =
+            `Prediction: <b>${predictions[0].className}</b>
+             <br>Confidence: ${(predictions[0].probability * 100).toFixed(2)}%`;
+    };
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PoseNet: Single vs Multi-Pose Accuracy Comparison</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body { 
+            font-family: 'Orbitron', monospace; 
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 100%);
+            color: #fff; 
+            min-height: 100vh; 
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center; margin-bottom: 30px;
+        }
+        
+        h1 { 
+            font-size: clamp(2rem, 5vw, 3.5rem); 
+            font-weight: 900; 
+            background: linear-gradient(45deg, #00ffff, #ff00ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            align-items: start;
+        }
+        
+        .pose-view {
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            padding: 20px;
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .view-header {
+            text-align: center; margin-bottom: 15px;
+            font-size: 1.4rem; font-weight: 700;
+        }
+        
+        .single-pose { border-left: 5px solid #4ade80; }
+        .multi-pose { border-left: 5px solid #f59e0b; }
+        
+        .video-container {
+            position: relative; 
+            margin: 0 auto 20px;
+            width: clamp(320px, 45vw, 600px);
+            height: clamp(240px, 33.75vw, 450px);
+            border-radius: 15px; 
+            overflow: hidden;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+        }
+        
+        video, canvas { width: 100%; height: 100%; border-radius: 15px; }
+        canvas { position: absolute; top: 0; left: 0; pointer-events: none; }
+        
+        .mode-controls {
+            display: flex; gap: 10px; justify-content: center; margin-bottom: 15px; flex-wrap: wrap;
+        }
+        
+        button {
+            padding: 10px 20px; 
+            border: none; 
+            border-radius: 25px; 
+            cursor: pointer; 
+            font-family: inherit; 
+            font-weight: 700; 
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .btn-start { background: linear-gradient(45deg, #4ade80, #22c55e); color: white; }
+        .btn-stop { background: linear-gradient(45deg, #ef4444, #dc2626); color: white; }
+        .btn-toggle { background: linear-gradient(45deg, #f59e0b, #d97706); color: white; }
+        
+        button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .metrics {
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 15px; 
+            margin-top: 15px;
+            font-size: 13px;
+        }
+        
+        .metric {
+            background: rgba(255,255,255,0.08);
+            padding: 12px; 
+            border-radius: 12px; 
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .metric-value { 
+            font-size: 1.4em; 
+            font-weight: 900; 
+            display: block;
+            color: #00ffff;
+        }
+        
+        .comparison {
+            grid-column: 1 / -1;
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 15px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .diff-table {
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 15px;
+            font-size: 14px;
+        }
+        
+        .diff-table th, .diff-table td {
+            padding: 12px 8px; 
+            text-align: center; 
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .diff-table th { background: rgba(0,255,255,0.2); }
+        
+        .highlight-better { background: rgba(74,222,128,0.3); }
+        .highlight-worse { background: rgba(239,68,68,0.2); }
+        
+        #status { 
+            grid-column: 1 / -1; 
+            text-align: center; 
+            padding: 15px; 
+            font-size: 1.1rem; 
+            font-weight: 700;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.05);
+        }
+        
+        @media (max-width: 1000px) {
+            .container { grid-template-columns: 1fr; gap: 20px; }
+            .metrics { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+        }
+        
+        .fps-counter {
+            position: absolute; top: 8px; right: 8px;
+            background: rgba(0,0,0,0.8); color: lime; padding: 4px 8px;
+            border-radius: 6px; font-size: 11px; font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>⚡ Single vs Multi-Pose Accuracy</h1>
+        <p>Real-time comparison of PoseNet detection modes</p>
+    </div>
+    
+    <div id="status">Loading PoseNet model...</div>
+    
+    <div class="container">
+        <div class="pose-view single-pose">
+            <div class="view-header">🎯 Single-Pose Mode<br><small>Best for 1 person, higher accuracy</small></div>
+            <div class="video-container">
+                <video id="videoSingle" autoplay playsinline muted></video>
+                <canvas id="canvasSingle"></canvas>
+                <div class="fps-counter" id="fpsSingle">0 FPS</div>
+            </div>
+            <div class="mode-controls">
+                <button id="startSingle" class="btn-start">▶️ Start Single</button>
+                <button id="stopSingle" class="btn-stop" disabled>⏹️ Stop</button>
+            </div>
+            <div class="metrics" id="metricsSingle"></div>
+        </div>
+        
+        <div class="pose-view multi-pose">
+            <div class="view-header">👥 Multi-Pose Mode<br><small>Multiple people, lower per-pose accuracy</small></div>
+            <div class="video-container">
+                <video id="videoMulti" autoplay playsinline muted></video>
+                <canvas id="canvasMulti"></canvas>
+                <div class="fps-counter" id="fpsMulti">0 FPS</div>
+            </div>
+            <div class="mode-controls">
+                <button id="startMulti" class="btn-start">▶️ Start Multi</button>
+                <button id="stopMulti" class="btn-stop" disabled>⏹️ Stop</button>
+            </div>
+            <div class="metrics" id="metricsMulti"></div>
+        </div>
+        
+        <div class="comparison">
+            <h3 style="text-align: center; margin-bottom: 15px;">📊 Live Accuracy Comparison</h3>
+            <table class="diff-table" id="comparisonTable">
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Single-Pose</th>
+                        <th>Multi-Pose</th>
+                        <th>Single Advantage</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>FPS</td><td id="avgFpsSingle">-</td><td id="avgFpsMulti">-</td><td id="fpsDiff">-</td></tr>
+                    <tr><td>Avg Confidence</td><td id="avgConfSingle">-</td><td id="avgConfMulti">-</td><td id="confDiff">-</td></tr>
+                    <tr><td>Keypoints/Pose</td><td id="avgKpSingle">-</td><td id="avgKpMulti">-</td><td id="kpDiff">-</td></tr>
+                    <tr><td>Poses Detected</td><td id="posesSingle">-</td><td id="posesMulti">-</td><td id="posesDiff">-</td></tr>
+                    <tr><td>Stability (var)</td><td id="stabilitySingle">-</td><td id="stabilityMulti">-</td><td id="stabilityDiff">-</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.1/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet@2.2.2/dist/posenet.min.js"></script>
+
+    <script>
+        class PoseComparison {
+            constructor() {
+                this.net = null;
+                this.singleDetector = new Detector('Single', document.getElementById('videoSingle'), document.getElementById('canvasSingle'), document.getElementById('fpsSingle'), document.getElementById('metricsSingle'));
+                this.multiDetector = new Detector('Multi', document.getElementById('videoMulti'), document.getElementById('canvasMulti'), document.getElementById('fpsMulti'), document.getElementById('metricsMulti'));
+                this.statsHistory = { single: [], multi: [] };
+                this.init();
+            }
+
+            async init() {
+                document.getElementById('status').textContent = '🧠 Loading PoseNet...';
+                this.net = await posenet.load({
+                    architecture: 'MobileNetV1',
+                    multiplier: 0.75
+                });
+                document.getElementById('status').textContent = '✅ Model ready! Use separate controls for each mode.';
+                
+                // Event listeners
+                document.getElementById('startSingle').onclick = () => this.singleDetector.start(this.net);
+                document.getElementById('stopSingle').onclick = () => this.singleDetector.stop();
+                document.getElementById('startMulti').onclick = () => this.multiDetector.start(this.net, true);
+                document.getElementById('stopMulti').onclick = () => this.multiDetector.stop();
+                
+                // Update comparison table
+                setInterval(() => this.updateComparison(), 2000);
+            }
+
+            updateComparison() {
+                const s = this.statsHistory.single.slice(-30); // last 30 frames
+                const m = this.statsHistory.multi.slice(-30);
+                
+                if (s.length < 10 || m.length < 10) return;
+                
+                const avgFpsS = s.reduce((sum, st) => sum + st.fps, 0) / s.length;
+                const avgFpsM = m.reduce((sum, st) => sum + st.fps, 0) / m.length;
+                const avgConfS = s.reduce((sum, st) => sum + st.confidence, 0) / s.length;
+                const avgConfM = m.reduce((sum, st) => sum + st.confidence, 0) / m.length;
+                const avgKpS = s.reduce((sum, st) => sum + st.keypoints, 0) / s.length;
+                const avgKpM = m.reduce((sum, st) => sum + st.keypoints, 0) / m.length;
+                const posesS = s[0]?.poses || 1;
+                const posesM = m.reduce((sum, st) => sum + st.poses, 0) / m.length;
+                
+                // Stability (variance of confidence)
+                const confVarS = this.variance(s.map(st => st.confidence));
+                const confVarM = this.variance(m.map(st => st.confidence));
+                
+                // Update table
+                document.getElementById('avgFpsSingle').textContent = avgFpsS.toFixed(1);
+                document.getElementById('avgFpsMulti').textContent = avgFpsM.toFixed(1);
+                document.getElementById('fpsDiff').innerHTML = avgFpsS > avgFpsM ? `<span class="highlight-better">${(avgFpsS-avgFpsM).toFixed(1)}↑</span>` : (avgFpsM-avgFpsS).toFixed(1) + '↓';
+                
+                document.getElementById('avgConfSingle').textContent = (avgConfS*100).toFixed(0) + '%';
+                document.getElementById('avgConfMulti').textContent = (avgConfM*100).toFixed(0) + '%';
+                document.getElementById('confDiff').innerHTML = avgConfS > avgConfM ? `<span class="highlight-better">${((avgConfS-avgConfM)*100).toFixed(0)}%↑</span>` : ((avgConfM-avgConfS)*100).toFixed(0) + '%↓';
+                
+                document.getElementById('avgKpSingle').textContent = avgKpS.toFixed(1);
+                document.getElementById('avgKpMulti').textContent = avgKpM.toFixed(1);
+                document.getElementById('kpDiff').innerHTML = avgKpS > avgKpM ? `<span class="highlight-better">${(avgKpS-avgKpM).toFixed(1)}↑</span>` : (avgKpM-avgKpS).toFixed(1) + '↓';
+                
+                document.getElementById('posesSingle').textContent = posesS;
+                document.getElementById('posesMulti').textContent = posesM.toFixed(1);
+                document.getElementById('posesDiff').innerHTML = posesM > posesS ? `<span class="highlight-better">${(posesM-posesS).toFixed(1)}↑</span>` : (posesS-posesM).toFixed(1) + '↓';
+                
+                document.getElementById('stabilitySingle').textContent = confVarS.toFixed(3);
+                document.getElementById('stabilityMulti').textContent = confVarM.toFixed(3);
+                document.getElementById('stabilityDiff').innerHTML = confVarS < confVarM ? `<span class="highlight-better">${(confVarM-confVarS).toFixed(3)}↑</span>` : (confVarS-confVarM).toFixed(3) + '↓';
+            }
+            
+            variance(numbers) {
+                const mean = numbers.reduce((a, b) => a + b) / numbers.length;
+                return numbers.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / numbers.length;
+            }
+        }
+
+        class Detector {
+            constructor(name, video, canvas, fpsEl, metricsEl) {
+                this.name = name;
+                this.video = video;
+                this.canvas = canvas;
+                this.ctx = canvas.getContext('2d');
+                this.fpsEl = fpsEl;
+                this.metricsEl = metricsEl;
+                this.isRunning = false;
+                this.stream = null;
+                this.fps = 0;
+                this.lastTime = 0;
+                this.statsHistory = [];
+            }
+
+            async start(net, multi = false) {
+                try {
+                    this.stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    this.video.srcObject = this.stream;
+                    await new Promise(r => this.video.onloadedmetadata = r);
+                    
+                    this.isRunning = true;
+                    this.multi = multi;
+                    this.detectLoop(net);
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+
+            stop() {
+                this.isRunning = false;
+                if (this.stream) this.stream.getTracks().forEach(t => t.stop());
+                this.video.srcObject = null;
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            }
+
+            async detectLoop(net) {
+                if (!this.isRunning) return;
+                
+                const now = performance.now();
+                this.fps = 1000 / (now - this.lastTime);
+                this.lastTime = now;
+                this.fpsEl.textContent = this.fps.toFixed(1) + ' FPS';
+
+                try {
+                    let poses;
+                    if (this.multi) {
+                        poses = await net.estimateMultiplePoses(this.video, {
+                            flipHorizontal: true,
+                            maxDetections: 5,
+                            scoreThreshold: 0.3,
+                            nmsRadius: 30
+                        });
+                    } else {
+                        const pose = await net.estimateSinglePose(this.video, { flipHorizontal: true });
+                        poses = [pose];
+                    }
+                    
+                    this.drawPoses(poses);
+                    this.updateStats(poses);
+                    
+                } catch (e) {
+                    console.error(e);
+                }
+                
+                requestAnimationFrame(() => this.detectLoop(net));
+            }
+
+            drawPoses(poses) {
+                const rect = this.video.getBoundingClientRect();
+                this.canvas.width = rect.width;
+                this.canvas.height = rect.height;
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                poses.forEach((pose, idx) => {
+                    const alpha = 1 - (idx * 0.2);
+                    
+                    // Keypoints
+                    pose.keypoints.forEach(kp => {
+                        if (kp.score > 0.3) {
+                            const x = kp.position.x * this.canvas.width;
+                            const y = kp.position.y * this.canvas.height;
+                            this.ctx.beginPath();
+                            this.ctx.arc(x, y, 6, 0, Math.PI*2);
+                            this.ctx.fillStyle = `rgba(0,255,255,${alpha * kp.score})`;
+                            this.ctx.fill();
+                            this.ctx.strokeStyle = `rgba(255,255,255,${alpha * 0.5})`;
+                            this.ctx.lineWidth = 2;
+                            this.ctx.stroke();
+                        }
+                    });
+                    
+                    // Skeleton
+                    this.drawSkeleton(pose.keypoints, alpha);
+                });
+            }
+
+            drawSkeleton(keypoints, alpha = 1) {
+                const connections = [
+                    [5,6],[5,7],[5,11],[6,8],[6,12],[7,9],[11,12],[11,13],
+                    [13,15],[12,14],[14,16],[0,1],[0,2],[1,3],[2,4]
+                ];
+                
+                connections.forEach(([i1,i2]) => {
+                    const p1 = keypoints[i1], p2 = keypoints[i2];
+                    if (p1.score > 0.3 && p2.score > 0.3) {
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(p1.position.x * this.canvas.width, p1.position.y * this.canvas.height);
+                        this.ctx.lineTo(p2.position.x * thiscanvas.width, p2.position.y * this.canvas.height);
+                        this.ctx.strokeStyle = `rgba(255,165,0,${alpha * 0.6 * Math.min(p1.score, p2.score)})`;
+                        this.ctx.lineWidth = 4;
+                        this.ctx.lineCap = 'round';
+                        this.ctx.stroke();
+                    }
+                });
+            }
+
+            updateStats(poses) {
+                const stats = {
+                    fps: this.fps,
+                    confidence: poses.reduce((sum, pose) => sum + Math.max(...pose.keypoints.map(k => k.score)), 0) / poses.length,
+                    keypoints: poses.reduce((sum, pose) => sum + pose.keypoints.filter(k => k.score > 0.5).length, 0) / poses.length,
+                    poses: poses.length
+                };
+                
+                // Update metrics display
+                this.metricsEl.innerHTML = `
+                    <div class="metric"><span>Avg Conf</span><span class="metric-value">${(stats.confidence*100).toFixed(0)}%</span></div>
+                    <div class="metric"><span>Keypoints</span><span class="metric-value">${stats.keypoints.toFixed(1)}</span></div>
+                    <div class="metric"><span>Poses</span><span class="metric-value">${stats.poses}</span></div>
+                    <div class="metric"><span>FPS</span><span class="metric-value">${stats.fps.toFixed(1)}</span></div>
+                `;
+                
+                this.statsHistory.push(stats);
+                if (this.statsHistory.length > 60) this.statsHistory.shift(); // keep 1 min
+                
+                // Global history for comparison
+                window.comparison.statsHistory[this.name.toLowerCase()] = this.statsHistory;
+            }
+        }
+
+        // Global comparison instance
+        window.comparison = new PoseComparison();
+    </script>
+</body>
+</html>

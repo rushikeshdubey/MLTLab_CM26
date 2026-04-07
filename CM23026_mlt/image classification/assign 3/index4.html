@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>MobileNet vs ResNet</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+</head>
+
+<body>
+<h2>Model Comparison</h2>
+
+<input type="file" id="upload" accept="image/*">
+<br><br>
+<img id="img" width="250">
+<div id="result"></div>
+
+<script>
+let mobileNet;
+let resnet;
+
+(async () => {
+    mobileNet = await mobilenet.load();
+
+    resnet = await tf.loadGraphModel(
+        "https://tfhub.dev/google/imagenet/resnet_v2_50/classification/5",
+        {fromTFHub: true}
+    );
+})();
+
+function preprocess(img) {
+    return tf.tidy(() =>
+        tf.browser.fromPixels(img)
+            .resizeBilinear([224,224])
+            .toFloat()
+            .expandDims()
+    );
+}
+
+document.getElementById("upload").onchange = async e => {
+    const file = e.target.files[0];
+    const img = document.getElementById("img");
+    img.src = URL.createObjectURL(file);
+
+    img.onload = async () => {
+        const mPred = await mobileNet.classify(img, 3);
+
+        const tensor = preprocess(img);
+        const pred = resnet.predict(tensor);
+        const probs = tf.softmax(pred);
+        const top = await probs.topk(3).indices.data();
+
+        document.getElementById("result").innerHTML = `
+            <h3>MobileNet</h3>
+            ${mPred.map(p =>
+                `${p.className} (${(p.probability*100).toFixed(2)}%)`
+            ).join("<br>")}
+            <h3>ResNet (Class IDs)</h3>
+            ${Array.from(top).join(", ")}
+        `;
+    };
+};
+</script>
+</body>
+</html>

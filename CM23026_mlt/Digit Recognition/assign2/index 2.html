@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>MNIST Canvas + Console Prediction</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-vis"></script>
+  <style>
+    canvas { border:1px solid black; touch-action:none; }
+  </style>
+</head>
+<body>
+<h2>Draw a digit (0-9)</h2>
+<canvas id="canvas" width="280" height="280"></canvas><br>
+<button onclick="predictCanvas()">Predict Canvas Digit</button>
+<h4 id="output"></h4>
+
+<script>
+let model, ctx, drawing=false;
+const canvas = document.getElementById('canvas');
+ctx = canvas.getContext('2d');
+ctx.fillStyle="black"; ctx.fillRect(0,0,280,280);
+ctx.strokeStyle="white"; ctx.lineWidth=15; ctx.lineCap="round";
+
+// Canvas drawing
+canvas.addEventListener('pointerdown', e=>{drawing=true; draw(e);});
+canvas.addEventListener('pointermove', draw);
+canvas.addEventListener('pointerup', e=>{drawing=false; ctx.beginPath();});
+
+function draw(e){
+  if(!drawing) return;
+  const rect = canvas.getBoundingClientRect();
+  ctx.lineTo(e.clientX-rect.left, e.clientY-rect.top);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(e.clientX-rect.left, e.clientY-rect.top);
+}
+
+// ===== Synthetic MNIST-like data =====
+function createData(){
+  const xs = tf.randomNormal([500,28,28,1]);
+  const labels = tf.oneHot(tf.randomUniform([500],0,10,'int32'),10);
+  return {xs, labels};
+}
+
+// ===== CNN model =====
+function createCNN(){
+  const m = tf.sequential();
+  m.add(tf.layers.conv2d({inputShape:[28,28,1], filters:16, kernelSize:3, activation:'relu'}));
+  m.add(tf.layers.maxPooling2d({poolSize:2}));
+  m.add(tf.layers.flatten());
+  m.add(tf.layers.dense({units:64, activation:'relu'}));
+  m.add(tf.layers.dense({units:10, activation:'softmax'}));
+  m.compile({optimizer:'adam', loss:'categoricalCrossentropy', metrics:['accuracy']});
+  return m;
+}
+
+// ===== Preprocess canvas image =====
+function preprocessCanvas(){
+  let imgData = ctx.getImageData(0,0,280,280);
+  let tensor = tf.browser.fromPixels(imgData,1);
+  tensor = tf.scalar(255).sub(tensor);        // invert colors
+  tensor = tf.image.resizeBilinear(tensor,[28,28]);
+  tensor = tensor.expandDims(0).toFloat().div(255.0);
+  return tensor;
+}
+
+// ===== Predict canvas =====
+async function predictCanvas(){
+  if(!model){ alert("Model not trained yet!"); return; }
+  const input = preprocessCanvas();
+  const pred = model.predict(input);
+  const data = await pred.data();
+  const digit = data.indexOf(Math.max(...data));
+  document.getElementById('output').innerText = "Predicted Digit: "+digit;
+}
+
+// ===== Console prediction =====
+window.predictDigitConsole = async function(tensor){
+  if(!model){ console.log("Model not trained yet!"); return; }
+  const pred = model.predict(tensor);
+  const data = await pred.data();
+  const digit = data.indexOf(Math.max(...data));
+  console.log("Predicted Digit (Console):", digit);
+};
+
+// ===== Train CNN =====
+async function run(){
+  const {xs, labels} = createData();
+  model = createCNN();
+  window.model = model; // global for console use
+
+  console.log("Training CNN...");
+  await model.fit(xs, labels, {
+    epochs:5,
+    batchSize:64,
+    validationSplit:0.1,
+    callbacks: tfvis.show.fitCallbacks(
+      {name:"CNN Training Graph"},
+      ['loss','acc'],
+      {height:200}
+    )
+  });
+
+  console.log("Training finished! Canvas prediction ready.");
+}
+
+run();
+</script>
+</body>
+</html>

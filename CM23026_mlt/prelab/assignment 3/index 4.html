@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Reshape Demo</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+</head>
+<body>
+<h3>Check console output</h3>
+
+<script>
+  const tensor = tf.tensor([1,2,3,4,5,6]);
+
+  console.log("Original:");
+  tensor.print();
+
+  const reshaped = tensor.reshape([2,3]);
+  console.log("Reshaped (2x3):");
+  reshaped.print();
+
+  const flattened = reshaped.flatten();
+  console.log("Flattened:");
+  flattened.print();
+</script>
+
+</body>
+</html>

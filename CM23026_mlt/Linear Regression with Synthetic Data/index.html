@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>TFJS Regression Graph</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-vis"></script>
+</head>
+
+<body>
+<h2>Linear Regression Graph</h2>
+<p>Graphs appear automatically.</p>
+
+<script>
+async function run() {
+
+  // Data: y = 2x + 1
+  const xs = tf.tensor2d([1,2,3,4,5,6], [6,1]);
+  const ys = tf.tensor2d([3,5,7,9,11,13], [6,1]);
+
+  // Convert tensors to arrays
+  const xVals = Array.from(xs.dataSync());
+  const yVals = Array.from(ys.dataSync());
+
+  const data = xVals.map((x, i) => ({
+    x: x,
+    y: yVals[i]
+  }));
+
+  // Plot original data
+  tfvis.render.scatterplot(
+    { name: "Original Data" },
+    { values: data },
+    { xLabel: "X", yLabel: "Y", height: 300 }
+  );
+
+  // Model
+  window.model = tf.sequential();
+  model.add(tf.layers.dense({ units: 1, inputShape: [1] }));
+
+  model.compile({
+    optimizer: 'sgd',
+    loss: 'meanSquaredError'
+  });
+
+  // Train with loss graph
+  await model.fit(xs, ys, {
+    epochs: 100,
+    callbacks: tfvis.show.fitCallbacks(
+      { name: "Training Loss" },
+      ['loss'],
+      { height: 200 }
+    )
+  });
+
+  // Predictions
+  const preds = model.predict(xs);
+  const predVals = Array.from(preds.dataSync());
+
+  const predData = xVals.map((x, i) => ({
+    x: x,
+    y: predVals[i]
+  }));
+
+  tfvis.render.scatterplot(
+    { name: "Prediction vs Original" },
+    { values: [data, predData], series: ['Original', 'Predicted'] },
+    { xLabel: "X", yLabel: "Y", height: 300 }
+  );
+
+  // Console prediction function
+  window.predictValue = function(x){
+    model.predict(tf.tensor2d([x],[1,1])).print();
+  };
+
+  console.log("Use predictValue(x) in console");
+}
+
+run();
+</script>
+
+</body>
+</html>

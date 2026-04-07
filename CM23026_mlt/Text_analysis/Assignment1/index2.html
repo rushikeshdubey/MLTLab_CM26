@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentiment Classifier - Training</title>
+    
+    <!-- TensorFlow.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 700px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .dataset-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        .dataset-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+        
+        .text-group {
+            margin-bottom: 15px;
+        }
+        
+        .text-group h4 {
+            color: #28a745;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .text-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
+        .text-item {
+            background: #e8f5e9;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            color: #2e7d32;
+        }
+        
+        .text-group.negative h4 {
+            color: #dc3545;
+        }
+        
+        .text-group.negative .text-item {
+            background: #ffebee;
+            color: #c62828;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-bottom: 20px;
+        }
+        
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .training-progress {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            display: none;
+        }
+        
+        .training-progress.active {
+            display: block;
+        }
+        
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .progress {
+            width: 100%;
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .metrics {
+            margin-top: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+        }
+        
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .metric:last-child {
+            border-bottom: none;
+        }
+        
+        .metric-label {
+            color: #666;
+        }
+        
+        .metric-value {
+            color: #333;
+            font-weight: 600;
+        }
+        
+        .input-group {
+            margin-top: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 100px;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            resize: vertical;
+            transition: border-color 0.3s;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 10px;
+            display: none;
+        }
+        
+        .result.show {
+            display: block;
+        }
+        
+        .result.positive {
+            background: #d4edda;
+            border: 2px solid #28a745;
+        }
+        
+        .result.negative {
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+        }
+        
+        .result h2 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .result.positive h2 {
+            color: #28a745;
+        }
+        
+        .result.negative h2 {
+            color: #dc3545;
+        }
+        
+        .sample-texts {
+            margin-top: 20px;
+        }
+        
+        .sample-texts h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        .sample-btn {
+            padding: 8px 15px;
+            margin: 5px;
+            background: #f0f0f0;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+        
+        .sample-btn:hover {
+            background: #e0e0e0;
+        }
+        
+        .model-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e8eaf6;
+            border-radius: 10px;
+            font-size: 13px;
+            color: #333;
+        }
+        
+        .model-info h4 {
+            margin-bottom: 8px;
+            color: #3f51b5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Sentiment Classifier Training</h1>
+        <p class="subtitle">RNN-based Binary Sentiment Analysis with TensorFlow.js</p>
+        
+        <div class="dataset-section">
+            <h3>📚 Training Dataset (Small Dataset)</h3>
+            
+            <div class="text-group">
+                <h4>✅ Positive Sentences (Label: 1)</h4>
+                <div class="text-list" id="positiveTexts"></div>
+            </div>
+            
+            <div class="text-group negative">
+                <h4>❌ Negative Sentences (Label: 0)</h4>
+                <div class="text-list" id="negativeTexts"></div>
+            </div>
+        </div>
+        
+        <button class="btn" id="trainBtn" onclick="startTraining()">
+            🚀 Train Sentiment Classifier
+        </button>
+        
+        <div class="training-progress" id="trainingProgress">
+            <div class="progress-info">
+                <span id="epochDisplay">Epoch: 0/20</span>
+                <span id="statusDisplay">Initializing...</span>
+            </div>
+            <div class="progress">
+                <div class="progress-bar" id="progressBar" style="width: 0%">0%</div>
+            </div>
+            
+            <div class="metrics">
+                <div class="metric">
+                    <span class="metric-label">Training Loss</span>
+                    <span class="metric-value" id="lossValue">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Training Accuracy</span>
+                    <span class="metric-value" id="accValue">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Validation Loss</span>
+                    <span class="metric-value" id="valLossValue">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Validation Accuracy</span>
+                    <span class="metric-value" id="valAccValue">-</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="model-info" id="modelInfo" style="display: none;">
+            <h4>📊 Model Architecture</h4>
+            <p>• Embedding Layer: 5000 vocabulary → 32 dimensions</p>
+            <p>• LSTM Layer: 32 units with dropout</p>
+            <p>• Dense Layer: 16 units (ReLU)</p>
+            <p>• Output Layer: 1 unit (Sigmoid)</p>
+            <p>• Optimizer: Adam (learning rate: 0.001)</p>
+            <p>• Loss Function: Binary Crossentropy</p>
+        </div>
+        
+        <div class="input-group" id="inputSection" style="display: none;">
+            <label for="textInput">Enter Text to Analyze:</label>
+            <textarea id="textInput" placeholder="Type your text here..."></textarea>
+            
+            <button class="btn" id="analyzeBtn" onclick="analyzeSentiment()">
+                🔍 Analyze Sentiment
+            </button>
+            
+            <div class="sample-texts">
+                <h3>Try these examples:</h3>
+                <button class="sample-btn" onclick="setSample('positive')">"I love this! Absolutely wonderful!"</button>
+                <button class="sample-btn" onclick="setSample('negative')">"This is terrible. I hate it."</button>
+                <button class="sample-btn" onclick="setSample('positive2')">"Great product, highly recommend!"</button>
+                <button class="sample-btn" onclick="setSample('negative2')">"Worst purchase ever. Very disappointing."</button>
+            </div>
+            
+            <div id="result" class="result">
+                <h2 id="sentimentLabel"></h2>
+                <p id="confidenceLabel"></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const CONFIG = {
+            vocabSize: 5000,
+            maxLength: 50,
+            embeddingDim: 32,
+            lstmUnits: 32,
+            epochs: 20,
+            batchSize: 4
+        };
+        
+        let model = null;
+        let vocab = {};
+        let isTrainingComplete = false;
+        
+        // ============ DATASET ============
+        // Small dataset of positive and negative sentences
+        const positiveSentences = [
+            "I love this product",
+            "This is amazing and wonderful",
+            "Great quality and excellent service",
+            "Very happy with my purchase",
+            "Best product I have ever bought",
+            "Absolutely fantastic and recommend",
+            "Wonderful experience overall",
+            "Very satisfied with this",
+            "Excellent value for money",
+            "Love it so much"
+        ];
+        
+        const negativeSentences = [
+            "I hate this product",
+            "This is terrible and awful",
+            "Very bad quality and poor service",
+            "Very disappointed with purchase",
+            "Worst product I have ever bought",
+            "Absolutely terrible and hate it",
+            "Horrible experience overall",
+            "Very unsatisfied with this",
+            "Complete waste of money",
+            "Dislike it very much"
+        ];
+        
+        // ============ DISPLAY DATASET ============
+        function displayDataset() {
+            const positiveContainer = document.getElementById('positiveTexts');
+            const negativeContainer = document.getElementById('negativeTexts');
+            
+            positiveSentences.forEach(text => {
+                const span = document.createElement('span');
+                span.className = 'text-item';
+                span.textContent = text;
+                positiveContainer.appendChild(span);
+            });
+            
+            negativeSentences.forEach(text => {
+                const span = document.createElement('span');
+                span.className = 'text-item';
+                span.textContent = text;
+                negativeContainer.appendChild(span);
+            });
+        }
+        
+        // ============ TEXT PREPROCESSING ============
+        function tokenize(text) {
+            return text.toLowerCase()
+                .replace(/[^\w\s]/g, ' ')
+                .split(/\s+/)
+                .filter(word => word.length > 0);
+        }
+        
+        function buildVocabulary(texts) {
+            const wordCounts = {};
+            
+            texts.forEach(text => {
+                const words = tokenize(text);
+                words.forEach(word => {
+                    wordCounts[word] = (wordCounts[word] || 0) + 1;
+                });
+            });
+            
+            // Sort by frequency and take top words
+            const sortedWords = Object.entries(wordCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, CONFIG.vocabSize - 3)
+                .map(entry => entry[0]);
+            
+            // Create vocabulary mapping
+            const vocabMap = { '<PAD>': 0, '<UNK>': 1, '<START>': 2 };
+            sortedWords.forEach((word, index) => {
+                vocabMap[word] = index + 3;
+            });
+            
+            return vocabMap;
+        }
+        
+        function textToSequence(text) {
+            const words = tokenize(text);
+            const sequence = words.map(word => vocab[word] || vocab['<UNK>']);
+            
+            // Pad or truncate to fixed length
+            if (sequence.length > CONFIG.maxLength) {
+                return sequence.slice(0, CONFIG.maxLength);
+            }
+            
+            // Pad with zeros
+            while (sequence.length < CONFIG.maxLength) {
+                sequence.push(0);
+            }
+            
+            return sequence;
+        }
+        
+        // ============ DATA AUGMENTATION ============
+        function augmentData(texts, label) {
+            const augmented = [];
+            const augmentations = [
+                (text) => text + " really",
+                (text) => "very " + text,
+                (text) => text + " indeed",
+                (text) => "absolutely " + text,
+                (text) => text + " truly"
+            ];
+            
+            texts.forEach((text, idx) => {
+                // Original
+                augmented.push({ text, label });
+                
+                // Augmented versions
+                augmentations.forEach(fn => {
+                    augmented.push({ text: fn(text), label });
+                });
+            });
+            
+            return augmented;
+        }
+        
+        // ============ CREATE MODEL ============
+        function createModel() {
+            const rnnModel = tf.sequential();
+            
+            // Embedding layer
+            rnnModel.add(tf.layers.embedding({
+                inputDim: CONFIG.vocabSize,
+                outputDim: CONFIG.embeddingDim,
+                inputLength: CONFIG.maxLength,
+                name: 'embedding'
+            }));
+            
+            // LSTM layer
+            rnnModel.add(tf.layers.lstm({
+                units: CONFIG.lstmUnits,
+                returnSequences: false,
+                dropout: 0.2,
+                recurrentDropout: 0.2,
+                name: 'lstm'
+            }));
+            
+            // Dense layers
+            rnnModel.add(tf.layers.dense({
+                units: 16,
+                activation: 'relu',
+                name: 'dense1'
+            }));
+            
+            rnnModel.add(tf.layers.dropout(0.3));
+            
+            // Output layer
+            rnnModel.add(tf.layers.dense({
+                units: 1,
+                activation: 'sigmoid',
+                name: 'output'
+            }));
+            
+            rnnModel.compile({
+                optimizer: tf.train.adam(0.001),
+                loss: 'binaryCrossentropy',
+                metrics: ['accuracy']
+            });
+            
+            return rnnModel;
+        }
+        
+        // ============ PREPARE TRAINING DATA ============
+        function prepareTrainingData() {
+            const allSentences = [...positiveSentences, ...negativeSentences];
+            vocab = buildVocabulary(allSentences);
+            
+            // Augment data
+            const augmentedPositive = augmentData(positiveSentences, 1);
+            const augmentedNegative = augmentData(negativeSentences, 0);
+            const allData = [...augmentedPositive, ...augmentedNegative];
+            
+            // Shuffle data
+            const shuffled = allData.sort(() => Math.random() - 0.5);
+            
+            const xs = shuffled.map(item => textToSequence(item.text));
+            const ys = shuffled.map(item => [item.label]);
+            
+            return {
+                xs: tf.tensor2d(xs, [xs.length, CONFIG.maxLength]),
+                ys: tf.tensor2d(ys, [ys.length, 1])
+            };
+        }
+        
+        // ============ TRAIN MODEL ============
+        async function startTraining() {
+            const trainBtn = document.getElementById('trainBtn');
+            trainBtn.disabled = true;
+            trainBtn.innerHTML = '⏳ Training in progress...';
+            
+            document.getElementById('trainingProgress').classList.add('active');
+            
+            console.log("Preparing training data...");
+            const { xs, ys } = prepareTrainingData();
+            
+            console.log("Creating model...");
+            model = createModel();
+            
+            console.log("Starting training...");
+            document.getElementById('statusDisplay').textContent = 'Training...';
+            
+            const totalSteps = CONFIG.epochs;
+            
+            await model.fit(xs, ys, {
+                epochs: CONFIG.epochs,
+                batchSize: CONFIG.batchSize,
+                validationSplit: 0.2,
+                shuffle: true,
+                callbacks: {
+                    onEpochEnd: async (epoch, logs) => {
+                        const progress = ((epoch + 1) / totalSteps) * 100;
+                        const progressBar = document.getElementById('progressBar');
+                        
+                        progressBar.style.width = progress + '%';
+                        progressBar.textContent = Math.round(progress) + '%';
+                        
+                        document.getElementById('epochDisplay').textContent = 
+                            `Epoch: ${epoch + 1}/${CONFIG.epochs}`;
+                        document.getElementById('lossValue').textContent = 
+                            logs.loss ? logs.loss.toFixed(4) : '-';
+                        document.getElementById('accValue').textContent = 
+                            logs.acc ? (logs.acc * 100).toFixed(2) + '%' : '-';
+                        document.getElementById('valLossValue').textContent = 
+                            logs.val_loss ? logs.val_loss.toFixed(4) : '-';
+                        document.getElementById('valAccValue').textContent = 
+                            logs.val_acc ? (logs.val_acc * 100).toFixed(2) + '%' : '-';
+                        
+                        // Allow UI to update
+                        await tf.nextFrame();
+                    }
+                }
+            });
+            
+            // Cleanup
+            xs.dispose();
+            ys.dispose();
+            
+            // Show results
+            isTrainingComplete = true;
+            document.getElementById('statusDisplay').textContent = '✅ Training Complete!';
+            document.getElementById('modelInfo').style.display = 'block';
+            document.getElementById('inputSection').style.display = 'block';
+            
+            trainBtn.innerHTML = '✅ Training Complete!';
+            console.log("Model training completed!");
+        }
+        
+        // ============ ANALYZE SENTIMENT ============
+        async function analyzeSentiment() {
+            const text = document.getElementById('textInput').value.trim();
+            
+            if (!text) {
+                alert("Please enter some text to analyze.");
+                return;
+            }
+            
+            if (!isTrainingComplete) {
+                alert("Please train the model first.");
+                return;
+            }
+            
+            const btn = document.getElementById('analyzeBtn');
+            btn.disabled = true;
+            btn.innerText = 'Analyzing...';
+            
+            try {
+                // Convert text to tensor
+                const sequence = textToSequence(text);
+                const inputTensor = tf.tensor2d([sequence], [1, CONFIG.maxLength]);
+                
+                // Get prediction
+                const prediction = model.predict(inputTensor);
+                const score = (await prediction.data())[0];
+                
+                // Cleanup
+                inputTensor.dispose();
+                prediction.dispose();
+                
+                // Display result
+                const resultDiv = document.getElementById('result');
+                const sentimentLabel = document.getElementById('sentimentLabel');
+                const confidenceLabel = document.getElementById('confidenceLabel');
+                
+                resultDiv.classList.remove('positive', 'negative');
+                
+                if (score >= 0.5) {
+                    resultDiv.classList.add('positive');
+                    sentimentLabel.textContent = '✅ Positive';
+                    confidenceLabel.textContent = `Confidence: ${(score * 100).toFixed(2)}%`;
+                } else {
+                    resultDiv.classList.add('negative');
+                    sentimentLabel.textContent = '❌ Negative';
+                    confidenceLabel.textContent = `Confidence: ${((1 - score) * 100).toFixed(2)}%`;
+                }
+                
+                resultDiv.classList.add('show');
+                
+            } catch (error) {
+                console.error("Error analyzing sentiment:", error);
+                alert("Error analyzing text. Please try again.");
+            }
+            
+            btn.disabled = false;
+            btn.innerText = '🔍 Analyze Sentiment';
+        }
+        
+        // ============ SAMPLE TEXTS ============
+        function setSample(type) {
+            const textArea = document.getElementById('textInput');
+            const samples = {
+                positive: "I love this! Absolutely wonderful!",
+                negative: "This is terrible. I hate it.",
+                positive2: "Great product, highly recommend!",
+                negative2: "Worst purchase ever. Very disappointing."
+            };
+            textArea.value = samples[type] || "";
+        }
+        
+        // Initialize
+        displayDataset();
+    </script>
+</body>
+</html>
+

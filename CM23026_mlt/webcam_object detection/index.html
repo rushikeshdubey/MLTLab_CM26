@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>AI Webcam Object Detection</title>
+
+<!-- TensorFlow.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.16.0"></script>
+
+<!-- COCO SSD Model -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+
+<style>
+body{
+    background:#0f172a;
+    color:white;
+    font-family:Arial;
+    text-align:center;
+}
+
+#container{
+    position:relative;
+    display:inline-block;
+}
+
+video{
+    width:720px;
+    border-radius:10px;
+}
+
+canvas{
+    position:absolute;
+    left:0;
+    top:0;
+}
+
+#stats{
+    margin-top:10px;
+    font-size:18px;
+}
+
+button{
+    margin-top:15px;
+    padding:10px 20px;
+    font-size:16px;
+    border:none;
+    border-radius:6px;
+    background:#22c55e;
+    color:white;
+    cursor:pointer;
+}
+
+button:hover{
+    background:#16a34a;
+}
+</style>
+</head>
+
+<body>
+
+<h2>AI Webcam Object Detection</h2>
+
+<div id="container">
+    <video id="webcam" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
+</div>
+
+<div id="stats">
+FPS: <span id="fps">0</span> |
+Objects: <span id="count">0</span>
+</div>
+
+<button onclick="captureImage()">Capture Detection</button>
+
+<script>
+
+const video = document.getElementById("webcam")
+const canvas = document.getElementById("canvas")
+const ctx = canvas.getContext("2d")
+
+let model
+let lastTime = performance.now()
+
+async function setupCamera(){
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+        video:true
+    })
+
+    video.srcObject = stream
+
+    return new Promise(resolve=>{
+        video.onloadedmetadata = ()=>{
+            canvas.width = video.videoWidth
+            canvas.height = video.videoHeight
+            resolve()
+        }
+    })
+}
+
+async function loadModel(){
+
+    model = await cocoSsd.load({
+        base:"lite_mobilenet_v2"
+    })
+
+    console.log("AI Model Loaded")
+}
+
+function drawBox(pred){
+
+    const [x,y,width,height] = pred.bbox
+
+    ctx.strokeStyle = "lime"
+    ctx.lineWidth = 3
+    ctx.strokeRect(x,y,width,height)
+
+    ctx.fillStyle = "lime"
+    ctx.font = "16px Arial"
+
+    ctx.fillText(
+        pred.class + " " + Math.round(pred.score*100) + "%",
+        x,
+        y>10 ? y-5 : 10
+    )
+}
+
+async function detect(){
+
+    ctx.drawImage(video,0,0,canvas.width,canvas.height)
+
+    const predictions = await model.detect(video)
+
+    predictions.forEach(pred=>{
+        drawBox(pred)
+    })
+
+    document.getElementById("count").innerText = predictions.length
+
+    const now = performance.now()
+    const fps = Math.round(1000/(now-lastTime))
+    lastTime = now
+
+    document.getElementById("fps").innerText = fps
+
+    requestAnimationFrame(detect)
+}
+
+function captureImage(){
+
+    const link = document.createElement("a")
+    link.download = "ai-detection.png"
+    link.href = canvas.toDataURL("image/png")
+    link.click()
+
+}
+
+async function main(){
+
+    await setupCamera()
+
+    await loadModel()
+
+    detect()
+}
+
+main()
+
+</script>
+
+</body>
+</html>

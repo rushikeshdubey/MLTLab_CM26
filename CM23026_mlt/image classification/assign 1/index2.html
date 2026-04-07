@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>MobileNet Image Classification</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+</head>
+
+<body>
+<h2>Classify Image (Top-3)</h2>
+
+<input type="file" id="upload" accept="image/*">
+<br><br>
+<img id="img" width="250">
+<h3 id="result"></h3>
+
+<script>
+let model;
+
+(async () => {
+    model = await mobilenet.load();
+    document.getElementById("result").innerText = "Model Loaded";
+})();
+
+document.getElementById("upload").onchange = async e => {
+    const file = e.target.files[0];
+    const img = document.getElementById("img");
+    img.src = URL.createObjectURL(file);
+
+    img.onload = async () => {
+        const preds = await model.classify(img, 3);
+
+        document.getElementById("result").innerHTML =
+            preds.map(p =>
+                `${p.className} (${(p.probability*100).toFixed(2)}%)`
+            ).join("<br>");
+    };
+};
+</script>
+</body>
+</html>

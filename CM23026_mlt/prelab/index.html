@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1" />
+		<title>TensorFlow.js Verify</title>
+	</head>
+	<body>
+		<h1>TensorFlow.js Verification</h1>
+		<p id="output">Loading TensorFlow.js...</p>
+
+		<!-- TensorFlow.js CDN -->
+		<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+
+		<script>
+  // Make variables global
+  window.a = tf.tensor([1, 2, 3]);
+  window.b = tf.tensor([4, 5, 6]);
+
+  console.log("Tensor a:");
+  a.print();
+
+  console.log("Tensor b:");
+  b.print();
+
+  const result = a.add(b);
+  console.log("a + b =");
+  result.print();
+</script>
+
+	</body>
+</html>

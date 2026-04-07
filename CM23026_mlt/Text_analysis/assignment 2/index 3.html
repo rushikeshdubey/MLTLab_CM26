@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Custom Sentences - Sentiment Analysis</title>
+    
+    <!-- TensorFlow.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-vis"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        .test-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 80px;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            resize: vertical;
+            transition: border-color 0.3s;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #11998e;
+        }
+        
+        .btn {
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(17, 153, 142, 0.4);
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+        }
+        
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 10px;
+            display: none;
+        }
+        
+        .result.positive {
+            background: #d4edda;
+            border: 2px solid #28a745;
+        }
+        
+        .result.negative {
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+        }
+        
+        .result.neutral {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+        }
+        
+        .result h2 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .result.positive h2 {
+            color: #28a745;
+        }
+        
+        .result.negative h2 {
+            color: #dc3545;
+        }
+        
+        .result.neutral h2 {
+            color: #856404;
+        }
+        
+        .confidence-bar {
+            width: 100%;
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .confidence-fill.positive {
+            background: linear-gradient(90deg, #28a745, #34ce57);
+        }
+        
+        .confidence-fill.negative {
+            background: linear-gradient(90deg, #dc3545, #e4606d);
+        }
+        
+        .confidence-details {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .interpretation-guide {
+            margin-top: 30px;
+            padding: 20px;
+            background: #e7f3ff;
+            border-radius: 10px;
+            border-left: 4px solid #2196F3;
+        }
+        
+        .interpretation-guide h4 {
+            color: #1976D2;
+            margin-bottom: 10px;
+        }
+        
+        .interpretation-guide ul {
+            margin-left: 20px;
+            color: #333;
+        }
+        
+        .interpretation-guide li {
+            margin-bottom: 5px;
+        }
+        
+        .test-history {
+            margin-top: 20px;
+        }
+        
+        .test-history h4 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .history-item {
+            padding: 10px;
+            margin-bottom: 10px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .history-item .text {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .history-item .result-text {
+            margin-top: 5px;
+            font-size: 14px;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #666;
+            font-size: 16px;
+            padding: 20px;
+        }
+        
+        .progress {
+            width: 100%;
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 Sentiment Analysis Testing</h1>
+        <p class="subtitle">Test Custom Sentences and Interpret Confidence Scores</p>
+        
+        <div id="loading" class="loading">
+            Training RNN model... please wait...<br>
+            <small>This may take a few seconds</small>
+            <div class="progress" style="margin-top: 15px;">
+                <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+            </div>
+            <p id="trainingStatus" style="margin-top: 10px;">Initializing...</p>
+        </div>
+        
+        <div id="mainContent" style="display: none;">
+            <!-- Quick Test Buttons -->
+            <div class="test-section">
+                <h3>🚀 Quick Test with Sample Sentences</h3>
+                <button class="btn" onclick="testSentence('I love this product! It is amazing and wonderful!')">
+                    Positive Test
+                </button>
+                <button class="btn btn-secondary" onclick="testSentence('This is terrible. I hate it and would not recommend.')">
+                    Negative Test
+                </button>
+                <button class="btn btn-secondary" onclick="testSentence('The product is okay, neither good nor bad.')">
+                    Neutral Test
+                </button>
+            </div>
+            
+            <!-- Custom Input -->
+            <div class="test-section">
+                <h3>✍️ Test Your Own Sentence</h3>
+                <div class="input-group">
+                    <label for="textInput">Enter custom text to analyze:</label>
+                    <textarea id="textInput" placeholder="Type your sentence here..."></textarea>
+                </div>
+                <button class="btn" id="analyzeBtn" onclick="analyzeSentiment()">Analyze Sentiment</button>
+                <button class="btn btn-secondary" onclick="clearInput()">Clear</button>
+            </div>
+            
+            <!-- Results Display -->
+            <div id="result" class="result">
+                <h2 id="sentimentLabel"></h2>
+                
+                <div class="confidence-bar">
+                    <div class="confidence-fill" id="confidenceFill"></div>
+                </div>
+                
+                <div class="confidence-details">
+                    <span id="confidenceLabel"></span>
+                    <span id="rawScore"></span>
+                </div>
+            </div>
+            
+            <!-- Interpretation Guide -->
+            <div class="interpretation-guide">
+                <h4>📖 How to Interpret Confidence Scores</h4>
+                <ul>
+                    <li><strong>Score ≥ 0.7 (70%):</strong> High confidence positive sentiment</li>
+                    <li><strong>Score 0.5-0.7 (50-70%):</strong> Moderate confidence - leaning positive</li>
+                    <li><strong>Score = 0.5 (50%):</strong> Uncertain/Borderline - may need more context</li>
+                    <li><strong>Score 0.3-0.5 (30-50%):</strong> Moderate confidence - leaning negative</li>
+                    <li><strong>Score ≤ 0.3 (30%):</strong> High confidence negative sentiment</li>
+                </ul>
+                <p style="margin-top: 10px; color: #666;">
+                    <strong>Formula:</strong> If score ≥ 0.5 → Positive (Confidence = score × 100%)<br>
+                    If score < 0.5 → Negative (Confidence = (1-score) × 100%)
+                </p>
+            </div>
+            
+            <!-- Test History -->
+            <div class="test-history">
+                <h4>📋 Test History</h4>
+                <div id="historyContainer">
+                    <p style="color: #666;">No tests yet. Try entering a sentence above!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Model Configuration
+        const VOCAB_SIZE = 10000;
+        const MAX_LENGTH = 100;
+        const EMBEDDING_DIM = 64;
+        
+        let model = null;
+        let vocab = {};
+        let isModelReady = false;
+        let testHistory = [];
+
+        // Simple word tokenization
+        function tokenize(text) {
+            return text.toLowerCase()
+                .replace(/[^\w\s]/g, ' ')
+                .split(/\s+/)
+                .filter(word => word.length > 0);
+        }
+
+        // Build vocabulary from text
+        function buildVocab(texts) {
+            const wordCounts = {};
+            
+            texts.forEach(text => {
+                const words = tokenize(text);
+                words.forEach(word => {
+                    wordCounts[word] = (wordCounts[word] || 0) + 1;
+                });
+            });
+            
+            const sortedWords = Object.entries(wordCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, VOCAB_SIZE - 2)
+                .map(entry => entry[0]);
+            
+            const vocabMap = { '<PAD>': 0, '<UNK>': 1 };
+            sortedWords.forEach((word, index) => {
+                vocabMap[word] = index + 2;
+            });
+            
+            return vocabMap;
+        }
+
+        // Convert text to sequence
+        function textToSequence(text) {
+            const words = tokenize(text);
+            const sequence = words.map(word => vocab[word] || vocab['<UNK>']);
+            
+            if (sequence.length > MAX_LENGTH) {
+                return sequence.slice(0, MAX_LENGTH);
+            }
+            
+            while (sequence.length < MAX_LENGTH) {
+                sequence.push(0);
+            }
+            
+            return sequence;
+        }
+
+        // Create RNN model for sentiment analysis
+        function createModel() {
+            const rnnModel = tf.sequential();
+            
+            rnnModel.add(tf.layers.embedding({
+                inputDim: VOCAB_SIZE,
+                outputDim: EMBEDDING_DIM,
+                inputLength: MAX_LENGTH
+            }));
+            
+            rnnModel.add(tf.layers.lstm({
+                units: 32,
+                returnSequences: false,
+                dropout: 0.2
+            }));
+            
+            rnnModel.add(tf.layers.dense({
+                units: 16,
+                activation: 'relu'
+            }));
+            
+            rnnModel.add(tf.layers.dropout(0.3));
+            
+            rnnModel.add(tf.layers.dense({
+                units: 1,
+                activation: 'sigmoid'
+            }));
+            
+            rnnModel.compile({
+                optimizer: tf.train.adam(0.001),
+                loss: 'binaryCrossentropy',
+                metrics: ['accuracy']
+            });
+            
+            return rnnModel;
+        }
+
+        // Generate synthetic training data
+        function generateTrainingData() {
+            const positiveTexts = [
+                "I love this product amazing wonderful",
+                "Great excellent fantastic best ever",
+                "Happy wonderful beautiful love it",
+                "Perfect awesome incredible recommend",
+                "Good nice super love this",
+                "Excellent amazing wonderful perfect",
+                "Best product ever quality great",
+                "Love it so much happy",
+                "Wonderful experience highly recommend",
+                "Amazing product great quality"
+            ];
+            
+            const negativeTexts = [
+                "Terrible awful horrible worst hate",
+                "Bad poor quality waste money",
+                "Disappointing terrible not recommend",
+                "Horrible awful terrible dislike",
+                "Worst product ever broken hate",
+                "Poor quality terrible experience",
+                "Awful horrible not worth it",
+                "Bad terrible waste of time",
+                "Horrible product disappointed hate",
+                "Terrible awful not good at all"
+            ];
+            
+            const allTexts = [...positiveTexts, ...negativeTexts];
+            vocab = buildVocab(allTexts);
+            
+            const xs = [];
+            const ys = [];
+            
+            positiveTexts.forEach(text => {
+                xs.push(textToSequence(text));
+                ys.push([1]);
+            });
+            
+            negativeTexts.forEach(text => {
+                xs.push(textToSequence(text));
+                ys.push([0]);
+            });
+            
+            for (let i = 0; i < 50; i++) {
+                const posText = positiveTexts[i % positiveTexts.length];
+                const negText = negativeTexts[i % negativeTexts.length];
+                
+                xs.push(textToSequence(posText + " really good"));
+                ys.push([1]);
+                
+                xs.push(textToSequence(negText + " really bad"));
+                ys.push([0]);
+            }
+            
+            return {
+                xs: tf.tensor2d(xs, [xs.length, MAX_LENGTH]),
+                ys: tf.tensor2d(ys, [ys.length, 1])
+            };
+        }
+
+        // Train the model
+        async function trainModel() {
+            console.log("Generating training data...");
+            const { xs, ys } = generateTrainingData();
+            
+            console.log("Creating RNN model...");
+            model = createModel();
+            
+            console.log("Training started...");
+            document.getElementById('trainingStatus').innerText = 'Training in progress...';
+            
+            await model.fit(xs, ys, {
+                epochs: 10,
+                batchSize: 8,
+                validationSplit: 0.2,
+                callbacks: {
+                    onEpochEnd: async (epoch, logs) => {
+                        const progress = ((epoch + 1) / 10) * 100;
+                        document.getElementById('progressBar').style.width = `${progress}%`;
+                        document.getElementById('trainingStatus').innerText = 
+                            `Epoch ${epoch + 1}/10 - Loss: ${logs.loss.toFixed(4)} - Accuracy: ${(logs.acc * 100).toFixed(2)}%`;
+                        
+                        console.log(`Epoch ${epoch + 1}: loss = ${logs.loss}, acc = ${logs.acc}`);
+                        await tf.nextFrame();
+                    }
+                }
+            });
+            
+            xs.dispose();
+            ys.dispose();
+            
+            isModelReady = true;
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('mainContent').style.display = 'block';
+            console.log("Model training completed!");
+        }
+
+        // Analyze sentiment
+        async function analyzeSentiment() {
+            const text = document.getElementById('textInput').value.trim();
+            
+            if (!text) {
+                alert("Please enter some text to analyze.");
+                return;
+            }
+
+            if (!isModelReady) {
+                alert("Model is still training. Please wait.");
+                return;
+            }
+
+            await processPrediction(text);
+        }
+
+        // Test with predefined sentence
+        async function testSentence(text) {
+            if (!isModelReady) {
+                alert("Model is still training. Please wait.");
+                return;
+            }
+            
+            document.getElementById('textInput').value = text;
+            await processPrediction(text);
+        }
+
+        // Process prediction
+        async function processPrediction(text) {
+            try {
+                console.log("Analyzing text:", text);
+                
+                const sequence = textToSequence(text);
+                const inputTensor = tf.tensor2d([sequence], [1, MAX_LENGTH]);
+                
+                const prediction = model.predict(inputTensor);
+                const score = (await prediction.data())[0];
+                
+                inputTensor.dispose();
+                prediction.dispose();
+                
+                console.log("Raw prediction score:", score);
+                
+                displayResult(text, score);
+                addToHistory(text, score);
+                
+            } catch (error) {
+                console.error("Error analyzing sentiment:", error);
+                alert("Error analyzing text. Please try again.");
+            }
+        }
+
+        // Display result
+        function displayResult(text, score) {
+            const resultDiv = document.getElementById('result');
+            const sentimentLabel = document.getElementById('sentimentLabel');
+            const confidenceLabel = document.getElementById('confidenceLabel');
+            const confidenceFill = document.getElementById('confidenceFill');
+            const rawScore = document.getElementById('rawScore');
+            
+            resultDiv.classList.remove('positive', 'negative', 'neutral');
+            
+            let confidence, label, fillClass;
+            
+            if (score >= 0.5) {
+                confidence = score * 100;
+                label = "✅ Positive";
+                fillClass = "positive";
+                resultDiv.classList.add('positive');
+            } else {
+                confidence = (1 - score) * 100;
+                label = "❌ Negative";
+                fillClass = "negative";
+                resultDiv.classList.add('negative');
+            }
+            
+            sentimentLabel.innerText = label;
+            confidenceLabel.innerText = `Confidence: ${confidence.toFixed(2)}%`;
+            rawScore.innerText = `Raw Score: ${score.toFixed(4)}`;
+            
+            confidenceFill.className = `confidence-fill ${fillClass}`;
+            confidenceFill.style.width = `${confidence}%`;
+            confidenceFill.innerText = `${confidence.toFixed(1)}%`;
+            
+            resultDiv.style.display = 'block';
+        }
+
+        // Add to history
+        function addToHistory(text, score) {
+            const confidence = score >= 0.5 ? score * 100 : (1 - score) * 100;
+            const sentiment = score >= 0.5 ? "Positive" : "Negative";
+            
+            testHistory.unshift({
+                text: text,
+                score: score,
+                confidence: confidence,
+                sentiment: sentiment
+            });
+            
+            if (testHistory.length > 10) {
+                testHistory.pop();
+            }
+            
+            updateHistoryDisplay();
+        }
+
+        // Update history display
+        function updateHistoryDisplay() {
+            const container = document.getElementById('historyContainer');
+            
+            if (testHistory.length === 0) {
+                container.innerHTML = '<p style="color: #666;">No tests yet. Try entering a sentence above!</p>';
+                return;
+            }
+            
+            container.innerHTML = testHistory.map((item, index) => `
+                <div class="history-item">
+                    <div class="text">"${item.text}"</div>
+                    <div class="result-text">
+                        <strong>${item.sentiment}</strong> - Confidence: ${item.confidence.toFixed(2)}% 
+                        (Raw: ${item.score.toFixed(4)})
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Clear input
+        function clearInput() {
+            document.getElementById('textInput').value = '';
+            document.getElementById('result').style.display = 'none';
+        }
+
+        // Initialize on page load
+        trainModel();
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Assignment 1 - CNN MNIST Training</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-vis"></script>
+</head>
+<body>
+<h2>Assignment 1: Train CNN on MNIST</h2>
+
+<script>
+let cnnModel;
+
+function createCNN(){
+  const model = tf.sequential();
+  model.add(tf.layers.conv2d({inputShape:[28,28,1], filters:8, kernelSize:3, activation:'relu'}));
+  model.add(tf.layers.maxPooling2d({poolSize:2}));
+  model.add(tf.layers.flatten());
+  model.add(tf.layers.dense({units:32, activation:'relu'}));
+  model.add(tf.layers.dense({units:10, activation:'softmax'}));
+
+  model.compile({
+    optimizer:'adam',
+    loss:'categoricalCrossentropy',
+    metrics:['accuracy']
+  });
+  return model;
+}
+
+function createData(){
+  // Synthetic data for demo
+  const xs = tf.randomNormal([500,28,28,1]);
+  const labels = tf.oneHot(tf.randomUniform([500],0,10,'int32'),10);
+  return {xs, labels};
+}
+
+async function run(){
+  const {xs, labels} = createData();
+  cnnModel = createCNN();
+
+  console.log("Training CNN...");
+  await cnnModel.fit(xs, labels, {
+    epochs:5,
+    batchSize:64,
+    validationSplit:0.1,
+    callbacks: tfvis.show.fitCallbacks(
+      {name:"CNN Training Graph"},
+      ['loss','acc'],
+      {height:200}
+    )
+  });
+
+  console.log("Training finished!");
+}
+
+run();
+</script>
+</body>
+</html>
